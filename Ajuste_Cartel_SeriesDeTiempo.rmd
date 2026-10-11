@@ -1,0 +1,225 @@
+---
+title: "Análisis INP construción"
+author: "Martínez Ornelas Ángel"
+date: "2026-10-10"
+output: pdf_document
+---
+
+```{r}
+rm(list=ls())
+install.packages("tidyr")
+install.packages("tidyverse")
+install.packages("tseries")
+install.packages("patchwork")
+install.packages("TSstudio")
+library(tidyr)
+library(tidyverse)
+library(forecast)
+library(tseries)
+library(lubridate)
+library(patchwork)
+library(TSstudio)
+```
+
+```{r}
+INP_construc <- read.csv("INP_construccion.csv", header=T)
+
+INP_construc %>%
+  mutate(Índice.general=ifelse(Índice.general=="N/E", NA, Índice.general))%>%
+  mutate(Subíndice.materiales.de.construcción = ifelse(Subíndice.materiales.de.construcción=="N/E", 
+                                                       NA, Subíndice.materiales.de.construcción))%>%
+  mutate(Subíndice.alquiler.de.maquinaria.y.equipo = ifelse(
+    Subíndice.alquiler.de.maquinaria.y.equipo=="N/E", NA, Subíndice.alquiler.de.maquinaria.y.equipo))%>%
+  mutate(Subíndice.de.remuneraciones=ifelse(Subíndice.de.remuneraciones=="N/E", 
+                                            NA, Subíndice.de.remuneraciones))
+
+INP_construc$Subíndice.materiales.de.construcción <- as.numeric(INP_construc$Subíndice.materiales.de.construcción)
+INP_construc$Subíndice.alquiler.de.maquinaria.y.equipo <- as.numeric(INP_construc$Subíndice.alquiler.de.maquinaria.y.equipo)
+INP_construc$Subíndice.de.remuneraciones <- as.numeric(INP_construc$Subíndice.de.remuneraciones )
+INP_construc$Fecha <- as.Date.character(INP_construc$Fecha, tryFormats = c("%d/%m/%Y"))
+str(INP_construc)
+```
+
+
+
+```{r}
+head(INP_construc)
+serie_ind_gral <- ts(INP_construc$Índice.general, start = c(1981, 1), 
+  end = c(2026, 9), frequency=12)
+log_indice_gral <- log(INP_construc$Índice.general)
+serie_log_ind_gral <- ts(log_indice_gral, start = c(1981, 1), 
+  end = c(2026, 9), frequency=12)
+log_crec_indice_gral <- diff(log_indice_gral)
+serie_log__crec_ind_gral <- ts(log_crec_indice_gral, start = c(1981, 1), 
+  end = c(2026, 9), frequency=12)
+
+lista_indices <- list(INP_construc$Índice.general,
+                      INP_construc$Subíndice.materiales.de.construcción,
+                      INP_construc$Subíndice.alquiler.de.maquinaria.y.equipo,
+                      INP_construc$Subíndice.de.remuneraciones)
+```
+
+
+```{r}
+plot_const <- ggplot(data = INP_construc, aes(x = Fecha, y = Índice.general, group = 1)) +
+  geom_line(color = "#000", linewidth = 0.6) + scale_x_date(date_breaks = "3 year", 
+  date_labels = "%Y") +
+  labs(title = "Índice general de construcción", x = NULL, y = "Índice general") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank()
+  )
+
+plot_mat <- ggplot(data = INP_construc, aes(x = Fecha, y = Subíndice.materiales.de.construcción,
+  group = 1)) +
+  geom_line(color = "#FF0000", linewidth = 0.9) + scale_x_date(date_breaks = "3 year", 
+  date_labels = "%Y") +
+  labs(title = "Subíndice materiales", x = NULL, y = "Subíndice") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank())
+
+plot_maq_eq <- ggplot(data = INP_construc, aes(x = Fecha, y = Subíndice.alquiler.de.maquinaria.y.equipo,
+  group = 1)) +
+  geom_line(color = "#0000FF", linewidth = 0.6) + scale_x_date(date_breaks = "3 year", 
+  date_labels = "%Y") +
+  labs(title = "Subíndice alquiler maquinaria y equipo.", x = NULL, y = "Subíndice") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank())
+
+plot_maq_rem <- ggplot(data = INP_construc, aes(x = Fecha, y = Subíndice.de.remuneraciones,
+  group = 1)) +
+  geom_line(color = "#FFA500", linewidth = 0.6) + scale_x_date(date_breaks = "3 year", 
+  date_labels = "%Y") +
+  labs(title = "Subíndice de remuneraciones", x = NULL, y = "Subíndice") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), panel.grid.minor = element_blank())
+
+datos_long <- INP_construc |>
+  pivot_longer(
+    cols = c(
+      Índice.general,
+      Subíndice.materiales.de.construcción,
+      Subíndice.alquiler.de.maquinaria.y.equipo,
+      Subíndice.de.remuneraciones
+    ),
+    names_to = "Indice",
+    values_to = "Valor"
+  )
+
+ggplot(
+  datos_long,
+  aes(x = Fecha, y = Valor, color = Indice, group = Indice)
+) +
+  geom_line(linewidth = 0.7) +
+  scale_color_manual(
+    values = c(
+      "Índice.general" = "#000000",
+      "Subíndice.materiales.de.construcción" = "#FF0000",
+      "Subíndice.alquiler.de.maquinaria.y.equipo" = "#0000FF",
+      "Subíndice.de.remuneraciones" = "#009C3B" 
+    ),
+    labels = c(
+      "Índice general",
+      "Materiales",
+      "Alquiler de maquinaria y equipo",
+      "Remuneraciones"
+    )
+  ) +
+  labs(
+    title = "Índices de construcción (INPP)",
+    x = NULL,
+    y = "Índice",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  )
+```
+```{r}
+INP_construc_XXI <- INP_construc[INP_construc$Fecha >= as.Date("2003-12-01"),]
+head(INP_construc_XXI)
+datos_long2 <- INP_construc_XXI |>
+  pivot_longer(
+    cols = c(
+      Índice.general,
+      Subíndice.materiales.de.construcción,
+      Subíndice.alquiler.de.maquinaria.y.equipo,
+      Subíndice.de.remuneraciones
+    ),
+    names_to = "Indice",
+    values_to = "Valor"
+  )
+
+ggplot(
+  datos_long2,
+  aes(x = Fecha, y = Valor, color = Indice, group = Indice)
+) +
+  geom_line(linewidth = 0.7) +
+  scale_x_date(
+    date_breaks = "2 year",
+    date_labels = "%Y"
+  )+
+  scale_color_manual(
+    values = c(
+      "Índice.general" = "#000000",
+      "Subíndice.materiales.de.construcción" = "#FF0000",
+      "Subíndice.alquiler.de.maquinaria.y.equipo" = "#0000FF",
+      "Subíndice.de.remuneraciones" = "#009C3B" 
+    ),
+    labels = c(
+      "Índice general",
+      "Materiales",
+      "Alquiler de maquinaria y equipo",
+      "Remuneraciones"
+    )
+  ) +
+  labs(
+    title = "Índices de construcción (INPP)",
+    x = NULL,
+    y = "Índice",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  )
+```
+
+```{r}
+modelo1 <- auto.arima(serie_ind_gral)
+modelo1
+checkresiduals(modelo1)
+```
+```{r}
+modelo2 <- auto.arima(serie_log_ind_gral)
+modelo2
+checkresiduals(modelo2)
+```
+
+```{r}
+modelo_sin_largo_plazo <- Arima(
+  log_indice_gral,
+  order = c(0, 1, 1),
+  method = "ML")
+modelo_sin_largo_plazo
+checkresiduals(modelo_sin_largo_plazo)
+```
+```{r}
+serie_ind_gral_2001 <- window(serie_ind_gral, start = c(2001, 1))
+serie_log_ind_gral_2001 <- window(serie_log_ind_gral, start = c(2001, 1))
+modelo1_2001 <- auto.arima(serie_ind_gral_2003)
+modelo1_2001
+checkresiduals(modelo1_2001)
+```
+
+
+```{r}
+modelo2_2001 <- auto.arima(serie_log_ind_gral_2001)
+modelo2_2001
+checkresiduals(modelo2_2001)
+```
+
